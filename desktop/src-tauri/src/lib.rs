@@ -6,6 +6,19 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// Path to the remote-server config file: ~/.claude/desktop-remote.json
+fn remote_config_path() -> Option<PathBuf> {
+    dirs::home_dir().map(|h| h.join(".claude").join("desktop-remote.json"))
+}
+
+/// Returns true if the user has configured a remote server URL.
+fn is_remote_mode() -> bool {
+    let Some(path) = remote_config_path() else { return false };
+    let Ok(data) = std::fs::read_to_string(&path) else { return false };
+    let Ok(val) = serde_json::from_str::<serde_json::Value>(&data) else { return false };
+    matches!(val.get("url"), Some(serde_json::Value::String(s)) if !s.trim().is_empty())
+}
+
 #[cfg(target_os = "macos")]
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 #[cfg(target_os = "macos")]
@@ -38,6 +51,19 @@ struct ServerStatus {
 /// 前端会通过 invoke('restart_adapters_sidecar') 来重启它，让新凭据生效。
 #[derive(Default)]
 struct AdapterState(Mutex<Option<CommandChild>>);
+
+/// Called by the frontend Settings page when the user saves remote server config.
+/// Persists the URL + token to ~/.claude/desktop-remote.json so Rust can read
+/// it on the next launch to decide whether to skip the local sidecar.
+#[tauri::command]
+fn save_remote_config(url: String, token: String) -> Result<(), String> {
+    let path = remote_config_path().ok_or("cannot resolve home directory")?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("create dir: {e}"))?;
+    }
+    let payload = serde_json::json!({ "url": url, "token": token });
+    std::fs::write(&path, payload.to_string()).map_err(|e| format!("write config: {e}"))
+}
 
 #[tauri::command]
 fn get_server_url(state: State<'_, ServerState>) -> Result<String, String> {
@@ -304,7 +330,8 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             get_server_url,
-            restart_adapters_sidecar
+            restart_adapters_sidecar,
+            save_remote_config
         ]);
 
     // macOS: native menu bar (traffic-light overlay style)
@@ -370,6 +397,12 @@ pub fn run() {
 
     let app = builder
         .setup(|app| {
+            // Skip local sidecars entirely when a remote server is configured.
+            if is_remote_mode() {
+                println!("[desktop] remote mode — skipping local sidecar startup");
+                return Ok(());
+            }
+
             let state = app.state::<ServerState>();
             let mut guard = state
                 .0

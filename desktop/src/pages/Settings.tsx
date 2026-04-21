@@ -25,6 +25,7 @@ import { useUpdateStore } from '../stores/updateStore'
 import {
   initializeDesktopServerUrl,
   isRemoteMode,
+  isTauriRuntime,
   REMOTE_SERVER_URL_KEY,
   REMOTE_SERVER_TOKEN_KEY
 } from '../lib/desktopRuntime'
@@ -1518,6 +1519,12 @@ function ServerSettings() {
         localStorage.setItem(REMOTE_SERVER_TOKEN_KEY, token.trim())
       } else {
         localStorage.removeItem(REMOTE_SERVER_TOKEN_KEY)
+      }
+
+      // Persist to disk so Rust can read it on next launch to skip local sidecar
+      if (isTauriRuntime()) {
+        const { invoke } = await import(/* @vite-ignore */ '@tauri-apps/api/core')
+        await invoke('save_remote_config', { url: url.trim(), token: token.trim() })
       }
 
       // Re-initialize API client
