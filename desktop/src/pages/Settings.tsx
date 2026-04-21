@@ -22,6 +22,11 @@ import { ComputerUseSettings } from './ComputerUseSettings'
 import { useUIStore, type SettingsTab } from '../stores/uiStore'
 import { ClaudeOfficialLogin } from '../components/settings/ClaudeOfficialLogin'
 import { useUpdateStore } from '../stores/updateStore'
+import {
+  initializeDesktopServerUrl,
+  REMOTE_SERVER_URL_KEY,
+  REMOTE_SERVER_TOKEN_KEY
+} from '../lib/desktopRuntime'
 
 export function Settings() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('providers')
@@ -47,6 +52,7 @@ export function Settings() {
             <TabButton icon="smart_toy" label={t('settings.tab.agents')} active={activeTab === 'agents'} onClick={() => setActiveTab('agents')} />
             <TabButton icon="auto_awesome" label={t('settings.tab.skills')} active={activeTab === 'skills'} onClick={() => setActiveTab('skills')} />
             <TabButton icon="mouse" label={t('settings.tab.computerUse')} active={activeTab === 'computerUse'} onClick={() => setActiveTab('computerUse')} />
+            <TabButton icon="settings_remote" label={t('settings.tab.server')} active={activeTab === 'server'} onClick={() => setActiveTab('server')} />
           </div>
           <div className="border-t border-[var(--color-border)]/40 pt-1">
             <TabButton icon="info" label={t('settings.tab.about')} active={activeTab === 'about'} onClick={() => setActiveTab('about')} />
@@ -62,6 +68,7 @@ export function Settings() {
           {activeTab === 'agents' && <AgentsSettings />}
           {activeTab === 'skills' && <SkillSettings />}
           {activeTab === 'computerUse' && <ComputerUseSettings />}
+          {activeTab === 'server' && <ServerSettings />}
           {activeTab === 'about' && <AboutSettings />}
         </div>
       </div>
@@ -1473,6 +1480,77 @@ function AboutSettings() {
             <span className="text-sm text-[var(--color-text-primary)]">relakkes@gmail.com</span>
             <span className="text-xs text-[var(--color-text-tertiary)] ml-auto">Email</span>
           </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Server Settings ──────────────────────────────────────
+
+function ServerSettings() {
+  const t = useTranslation()
+  const [url, setUrl] = useState(localStorage.getItem(REMOTE_SERVER_URL_KEY) || '')
+  const [token, setToken] = useState(localStorage.getItem(REMOTE_SERVER_TOKEN_KEY) || '')
+  const [isSaving, setIsSaving] = useState(false)
+  const { addToast } = useUIStore()
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    try {
+      if (url.trim()) {
+        localStorage.setItem(REMOTE_SERVER_URL_KEY, url.trim())
+      } else {
+        localStorage.removeItem(REMOTE_SERVER_URL_KEY)
+      }
+
+      if (token.trim()) {
+        localStorage.setItem(REMOTE_SERVER_TOKEN_KEY, token.trim())
+      } else {
+        localStorage.removeItem(REMOTE_SERVER_TOKEN_KEY)
+      }
+
+      // Re-initialize API client
+      await initializeDesktopServerUrl()
+
+      addToast({ type: 'success', message: t('settings.server.saveSuccess') })
+      
+      // Reload the page to ensure all stores re-fetch with new base URL
+      window.location.reload()
+    } catch (err) {
+      addToast({ type: 'error', message: String(err) })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <div className="max-w-xl">
+      <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">{t('settings.server.title')}</h2>
+      <p className="text-sm text-[var(--color-text-tertiary)] mb-6">{t('settings.server.description')}</p>
+
+      <div className="flex flex-col gap-4">
+        <Input
+          label={t('settings.server.url')}
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="http://12.34.56.78:3456"
+          hint={t('settings.server.urlHint')}
+        />
+
+        <Input
+          label={t('settings.server.token')}
+          type="password"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          placeholder="ANTHROPIC_API_KEY"
+          hint={t('settings.server.tokenHint')}
+        />
+
+        <div className="mt-2">
+          <Button onClick={handleSave} loading={isSaving}>
+            {t('common.save')}
+          </Button>
         </div>
       </div>
     </div>

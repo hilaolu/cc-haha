@@ -53,6 +53,16 @@ export const zh: Record<TranslationKey, string> = {
   'settings.tab.permissions': '权限',
   'settings.tab.general': '通用',
   'settings.tab.skills': '技能',
+  'settings.tab.server': '后端服务',
+
+  // Settings > Server
+  'settings.server.title': '后端服务器配置',
+  'settings.server.description': '配置连接到远程 Claude Code 后端服务。这允许将 AI 的执行环境与你的本地机器隔离。',
+  'settings.server.url': '服务器地址',
+  'settings.server.urlHint': '远程服务器的基础 URL（例如 http://your-ip:3456）。留空则使用本地 Sidecar。',
+  'settings.server.token': '认证令牌',
+  'settings.server.tokenHint': '如果服务器启动时开启了 --auth-required，请填写你的 ANTHROPIC_API_KEY。',
+  'settings.server.saveSuccess': '服务器设置已保存。正在重启应用...',
 
   // Settings > Claude Official Login
   'settings.claudeOfficialLogin.intro': '使用官方 Claude 模型需要登录你的 Claude.ai 账号。点击下方按钮,浏览器会打开 Claude 官方登录页面,授权后自动回到这里。',

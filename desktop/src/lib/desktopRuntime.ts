@@ -1,4 +1,7 @@
-import { getDefaultBaseUrl, setBaseUrl } from '../api/client'
+import { getDefaultBaseUrl, setBaseUrl, setAuthToken } from '../api/client'
+
+export const REMOTE_SERVER_URL_KEY = 'cc-haha-remote-server-url'
+export const REMOTE_SERVER_TOKEN_KEY = 'cc-haha-remote-server-token'
 
 export function isTauriRuntime() {
   if (typeof window === 'undefined') return false
@@ -6,6 +9,23 @@ export function isTauriRuntime() {
 }
 
 export async function initializeDesktopServerUrl() {
+  // 1. Try remote server from localStorage first
+  const remoteUrl = localStorage.getItem(REMOTE_SERVER_URL_KEY)
+  const remoteToken = localStorage.getItem(REMOTE_SERVER_TOKEN_KEY)
+
+  if (remoteUrl) {
+    console.log('[desktop] Using remote server:', remoteUrl)
+    setBaseUrl(remoteUrl)
+    setAuthToken(remoteToken)
+    // Validate health but don't fail hard if it's slow/down
+    try {
+      await waitForHealth(remoteUrl)
+    } catch (e) {
+      console.warn('[desktop] Remote server healthcheck failed:', e)
+    }
+    return remoteUrl
+  }
+
   const fallbackUrl = getDefaultBaseUrl()
 
   if (!isTauriRuntime()) {

@@ -51,6 +51,16 @@ export const en = {
   'settings.tab.permissions': 'Permissions',
   'settings.tab.general': 'General',
   'settings.tab.skills': 'Skills',
+  'settings.tab.server': 'Backend Server',
+
+  // Settings > Server
+  'settings.server.title': 'Backend Server',
+  'settings.server.description': 'Configure the connection to a remote Claude Code backend. This allows isolating AI execution from your local machine.',
+  'settings.server.url': 'Server URL',
+  'settings.server.urlHint': 'Base URL of your remote server (e.g., http://your-ip:3456). Leave empty to use local sidecar.',
+  'settings.server.token': 'Auth Token',
+  'settings.server.tokenHint': 'Required if the server was started with --auth-required (use your ANTHROPIC_API_KEY).',
+  'settings.server.saveSuccess': 'Server settings saved. Reloading app...',
 
   // Settings > Claude Official Login
   'settings.claudeOfficialLogin.intro': 'Using official Claude models requires signing in to your Claude.ai account. Click the button below to open the official Claude login page in your browser; you\'ll be returned here after authorizing.',

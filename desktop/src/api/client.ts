@@ -1,6 +1,7 @@
 const DEFAULT_BASE_URL = 'http://127.0.0.1:3456'
 
 let baseUrl = DEFAULT_BASE_URL
+let authToken: string | null = null
 
 export function setBaseUrl(url: string) {
   baseUrl = url.replace(/\/$/, '')
@@ -12,6 +13,10 @@ export function getBaseUrl() {
 
 export function getDefaultBaseUrl() {
   return DEFAULT_BASE_URL
+}
+
+export function setAuthToken(token: string | null) {
+  authToken = token
 }
 
 export class ApiError extends Error {
@@ -28,6 +33,10 @@ async function request<T>(method: string, path: string, body?: unknown, options?
   const url = `${baseUrl}${path}`
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+  }
+
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`
   }
 
   const controller = new AbortController()

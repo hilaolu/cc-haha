@@ -129,6 +129,28 @@ jobs:
           TAURI_ENV_TARGET_TRIPLE: ${{ matrix.rust_target }}
         run: bun run build:sidecars
 
+      # ── 构建 Frontend ────────────────────────────────────────
+      - name: Build Frontend
+        working-directory: desktop
+        run: bun run build
+
+      # ── 上传 Frontend Artifact ──────────────────────────────
+      - name: Upload Frontend Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend
+          path: desktop/dist
+          if-no-files-found: error
+          overwrite: true
+
+      # ── 上传 Backend Artifact ───────────────────────────────
+      - name: Upload Backend Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-${{ matrix.label }}
+          path: desktop/src-tauri/binaries
+          if-no-files-found: error
+
       # ── 构建 Tauri (无签名、无 updater) ──────────────────────
       - name: Build Tauri app
         working-directory: desktop

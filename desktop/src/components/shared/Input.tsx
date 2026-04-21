@@ -3,10 +3,11 @@ import type { InputHTMLAttributes } from 'react'
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   label?: string
   error?: string
+  hint?: string
   required?: boolean
 }
 
-export function Input({ label, error, required, className = '', id, ...props }: InputProps) {
+export function Input({ label, error, hint, required, className = '', id, ...props }: InputProps) {
   const inputId = id || label?.toLowerCase().replace(/\s+/g, '-')
   return (
     <div className="flex flex-col gap-1">
@@ -33,6 +34,7 @@ export function Input({ label, error, required, className = '', id, ...props }: 
         {...props}
       />
       {error && <p className="text-xs text-[var(--color-error)]">{error}</p>}
+      {hint && !error && <p className="text-[11px] text-[var(--color-text-tertiary)] mt-0.5">{hint}</p>}
     </div>
   )
 }

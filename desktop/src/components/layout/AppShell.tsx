@@ -81,6 +81,19 @@ export function AppShell() {
           <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
             {startupError}
           </p>
+          <div className="mt-6">
+            <button
+              onClick={() => {
+                setStartupError(null)
+                setReady(true)
+                useTabStore.getState().openTab(SETTINGS_TAB_ID, 'Settings', 'settings')
+                useUIStore.getState().setPendingSettingsTab('server')
+              }}
+              className="px-4 py-2 rounded-lg bg-[var(--color-brand)] text-white text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              {t('sidebar.settings')}
+            </button>
+          </div>
         </div>
       </div>
     )
