@@ -13,6 +13,16 @@ export async function initializeDesktopServerUrl() {
   const remoteUrl = localStorage.getItem(REMOTE_SERVER_URL_KEY)
   const remoteToken = localStorage.getItem(REMOTE_SERVER_TOKEN_KEY)
 
+  if (isTauriRuntime()) {
+    try {
+      const { invoke } = await import(/* @vite-ignore */ '@tauri-apps/api/core')
+      // Tell Rust backend if we are using remote or local
+      await invoke('set_remote_server_state', { url: remoteUrl || null })
+    } catch (e) {
+      console.warn('[desktop] Failed to sync remote server state to Rust:', e)
+    }
+  }
+
   if (remoteUrl) {
     console.log('[desktop] Using remote server:', remoteUrl)
     setBaseUrl(remoteUrl)
