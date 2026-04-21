@@ -1,4 +1,9 @@
 {
+  "bundle": {
+    "macOS": {
+      "entitlements": "./entitlements.plist"
+    }
+  },
   "app": {
     "windows": [
       {
