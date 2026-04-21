@@ -236,3 +236,11 @@ jobs:
           files: ${{ steps.collect.outputs.staging_dir }}/*
           body: ${{ steps.release_notes.outputs.body }}
           draft: ${{ github.event_name == 'workflow_dispatch' && inputs.draft || false }}
+
+      # ── Upload Desktop Artifact ──────────────────────────────
+      - name: Upload Desktop Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Claude-Code-Haha-${{ matrix.label }}
+          path: ${{ steps.collect.outputs.staging_dir }}
+          if-no-files-found: warn
