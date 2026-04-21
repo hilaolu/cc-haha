@@ -42,6 +42,12 @@ jobs:
             tauri_args: '--bundles deb'
             label: Linux-x64
 
+          # Linux musl x64 (Static for NixOS/Generic)
+          - platform: ubuntu-22.04
+            rust_target: x86_64-unknown-linux-musl
+            tauri_args: '--bundles deb'
+            label: Linux-musl-x64
+
           # Linux ARM64
           - platform: ubuntu-22.04-arm
             rust_target: aarch64-unknown-linux-gnu
