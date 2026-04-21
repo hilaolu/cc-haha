@@ -132,7 +132,9 @@ jobs:
       # ── 构建 Frontend ────────────────────────────────────────
       - name: Build Frontend
         working-directory: desktop
-        run: bun run build
+        run: |
+          bun install
+          bun run build
 
       # ── 上传 Frontend Artifact ──────────────────────────────
       - name: Upload Frontend Artifact
