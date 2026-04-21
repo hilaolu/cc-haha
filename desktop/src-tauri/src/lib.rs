@@ -1,5 +1,4 @@
 use std::{
-    io::{Error as IoError, ErrorKind},
     net::{SocketAddr, TcpListener, TcpStream},
     path::PathBuf,
     sync::Mutex,
@@ -33,13 +32,22 @@ struct ServerStatus {
     startup_error: Option<String>,
 }
 
+/// 与 ServerState 平级的 adapter 子进程状态。
+///
+/// adapter sidecar（claude-sidecar adapters --feishu --telegram）的生命周期
+/// 跟 server 不同：它没有 HTTP 端口可探活，没配凭据时会自己干净退出，
+/// 而且需要支持运行时热重启 —— 用户在设置页保存飞书 / Telegram 凭据后，
+/// 前端会通过 invoke('restart_adapters_sidecar') 来重启它，让新凭据生效。
+#[derive(Default)]
+struct AdapterState(Mutex<Option<CommandChild>>);
+
 #[tauri::command]
 fn get_server_url(
     config: State<'_, ServerConfig>,
     state: State<'_, ServerState>,
 ) -> Result<String, String> {
     // 1. If remote URL is configured in ServerConfig, return it immediately
-    if let Ok(guard) = config.0.lock() {
+    if let Ok(guard) = config.inner().0.lock() {
         if let Some(url) = guard.as_ref() {
             return Ok(url.clone());
         }
@@ -47,6 +55,7 @@ fn get_server_url(
 
     // 2. Otherwise return local runtime URL
     let guard = state
+        .inner()
         .0
         .lock()
         .map_err(|_| "desktop server state is unavailable".to_string())?;
@@ -68,7 +77,7 @@ fn set_remote_server_state(
     state: State<'_, ServerState>,
     app: AppHandle,
 ) -> Result<(), String> {
-    let mut config_guard = config.0.lock().map_err(|_| "config lock poisoned")?;
+    let mut config_guard = config.inner().0.lock().map_err(|_| "config lock poisoned")?;
     *config_guard = url.clone();
 
     if url.is_some() {
@@ -77,7 +86,7 @@ fn set_remote_server_state(
         stop_adapters_sidecar(&app);
     } else {
         // If we removed the remote URL, start local sidecar if it's not running
-        let mut state_guard = state.0.lock().map_err(|_| "state lock poisoned")?;
+        let mut state_guard = state.inner().0.lock().map_err(|_| "state lock poisoned")?;
         if state_guard.runtime.is_none() {
             match start_server_sidecar(&app) {
                 Ok(runtime) => {
@@ -214,7 +223,7 @@ fn stop_server_sidecar(app: &AppHandle) {
         return;
     };
 
-    let Ok(mut guard) = state.0.lock() else {
+    let Ok(mut guard) = state.inner().0.lock() else {
         return;
     };
 
@@ -240,6 +249,7 @@ fn start_adapters_sidecar(app: &AppHandle) -> Result<CommandChild, String> {
         .try_state::<ServerState>()
         .and_then(|state| {
             state
+                .inner()
                 .0
                 .lock()
                 .ok()
@@ -309,7 +319,7 @@ fn spawn_and_track_adapters_sidecar(app: &AppHandle) {
     match start_adapters_sidecar(app) {
         Ok(child) => {
             if let Some(state) = app.try_state::<AdapterState>() {
-                if let Ok(mut guard) = state.0.lock() {
+                if let Ok(mut guard) = state.inner().0.lock() {
                     *guard = Some(child);
                 }
             }
@@ -324,7 +334,7 @@ fn stop_adapters_sidecar(app: &AppHandle) {
     let Some(state) = app.try_state::<AdapterState>() else {
         return;
     };
-    let Ok(mut guard) = state.0.lock() else {
+    let Ok(mut guard) = state.inner().0.lock() else {
         return;
     };
     if let Some(child) = guard.take() {
