@@ -61,6 +61,8 @@ export const en = {
   'settings.server.token': 'Auth Token',
   'settings.server.tokenHint': 'Required if the server was started with --auth-required (use your ANTHROPIC_API_KEY).',
   'settings.server.saveSuccess': 'Server settings saved. Reloading app...',
+  'settings.server.remoteModeActive': 'Remote mode active',
+  'settings.server.remoteModeNote': 'Connected to a remote backend. Local features like Computer Use are disabled.',
 
   // Settings > Claude Official Login
   'settings.claudeOfficialLogin.intro': 'Using official Claude models requires signing in to your Claude.ai account. Click the button below to open the official Claude login page in your browser; you\'ll be returned here after authorizing.',

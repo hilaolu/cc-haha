@@ -8,6 +8,12 @@ export function isTauriRuntime() {
   return '__TAURI_INTERNALS__' in window || '__TAURI__' in window
 }
 
+export function isRemoteMode() {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return false
+  const remoteUrl = localStorage.getItem(REMOTE_SERVER_URL_KEY)
+  return !!remoteUrl && remoteUrl.trim() !== ''
+}
+
 export async function initializeDesktopServerUrl() {
   // 1. Try remote server from localStorage first
   const remoteUrl = localStorage.getItem(REMOTE_SERVER_URL_KEY)

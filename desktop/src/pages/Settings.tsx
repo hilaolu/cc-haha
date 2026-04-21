@@ -24,6 +24,7 @@ import { ClaudeOfficialLogin } from '../components/settings/ClaudeOfficialLogin'
 import { useUpdateStore } from '../stores/updateStore'
 import {
   initializeDesktopServerUrl,
+  isRemoteMode,
   REMOTE_SERVER_URL_KEY,
   REMOTE_SERVER_TOKEN_KEY
 } from '../lib/desktopRuntime'
@@ -32,12 +33,18 @@ export function Settings() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('providers')
   const pendingSettingsTab = useUIStore((s) => s.pendingSettingsTab)
   const t = useTranslation()
+  const remoteMode = isRemoteMode()
 
   useEffect(() => {
     if (!pendingSettingsTab) return
-    setActiveTab(pendingSettingsTab)
+    // If pending tab is computerUse but we're in remote mode, redirect to server tab
+    if (pendingSettingsTab === 'computerUse' && remoteMode) {
+      setActiveTab('server')
+    } else {
+      setActiveTab(pendingSettingsTab)
+    }
     useUIStore.getState().setPendingSettingsTab(null)
-  }, [pendingSettingsTab])
+  }, [pendingSettingsTab, remoteMode])
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-[var(--color-surface)]">
@@ -51,7 +58,9 @@ export function Settings() {
             <TabButton icon="chat" label={t('settings.tab.adapters')} active={activeTab === 'adapters'} onClick={() => setActiveTab('adapters')} />
             <TabButton icon="smart_toy" label={t('settings.tab.agents')} active={activeTab === 'agents'} onClick={() => setActiveTab('agents')} />
             <TabButton icon="auto_awesome" label={t('settings.tab.skills')} active={activeTab === 'skills'} onClick={() => setActiveTab('skills')} />
-            <TabButton icon="mouse" label={t('settings.tab.computerUse')} active={activeTab === 'computerUse'} onClick={() => setActiveTab('computerUse')} />
+            {!remoteMode && (
+              <TabButton icon="mouse" label={t('settings.tab.computerUse')} active={activeTab === 'computerUse'} onClick={() => setActiveTab('computerUse')} />
+            )}
             <TabButton icon="settings_remote" label={t('settings.tab.server')} active={activeTab === 'server'} onClick={() => setActiveTab('server')} />
           </div>
           <div className="border-t border-[var(--color-border)]/40 pt-1">
@@ -1494,6 +1503,7 @@ function ServerSettings() {
   const [token, setToken] = useState(localStorage.getItem(REMOTE_SERVER_TOKEN_KEY) || '')
   const [isSaving, setIsSaving] = useState(false)
   const { addToast } = useUIStore()
+  const remoteMode = isRemoteMode()
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -1514,7 +1524,7 @@ function ServerSettings() {
       await initializeDesktopServerUrl()
 
       addToast({ type: 'success', message: t('settings.server.saveSuccess') })
-      
+
       // Reload the page to ensure all stores re-fetch with new base URL
       window.location.reload()
     } catch (err) {
@@ -1528,6 +1538,16 @@ function ServerSettings() {
     <div className="max-w-xl">
       <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">{t('settings.server.title')}</h2>
       <p className="text-sm text-[var(--color-text-tertiary)] mb-6">{t('settings.server.description')}</p>
+
+      {remoteMode && (
+        <div className="mb-6 flex items-center gap-3 rounded-lg border border-[var(--color-brand)]/30 bg-[var(--color-brand)]/5 px-4 py-3">
+          <span className="material-symbols-outlined text-[20px] text-[var(--color-brand)]" style={{ fontVariationSettings: "'FILL' 1" }}>cloud</span>
+          <div className="flex-1">
+            <div className="text-sm font-medium text-[var(--color-text-primary)]">{t('settings.server.remoteModeActive')}</div>
+            <div className="text-xs text-[var(--color-text-tertiary)] mt-0.5">{t('settings.server.remoteModeNote')}</div>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col gap-4">
         <Input

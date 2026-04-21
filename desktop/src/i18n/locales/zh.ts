@@ -63,6 +63,8 @@ export const zh: Record<TranslationKey, string> = {
   'settings.server.token': '认证令牌',
   'settings.server.tokenHint': '如果服务器启动时开启了 --auth-required，请填写你的 ANTHROPIC_API_KEY。',
   'settings.server.saveSuccess': '服务器设置已保存。正在重启应用...',
+  'settings.server.remoteModeActive': '远程模式已启用',
+  'settings.server.remoteModeNote': '已连接到远程后端，本地功能（如电脑控制）已禁用。',
 
   // Settings > Claude Official Login
   'settings.claudeOfficialLogin.intro': '使用官方 Claude 模型需要登录你的 Claude.ai 账号。点击下方按钮,浏览器会打开 Claude 官方登录页面,授权后自动回到这里。',
