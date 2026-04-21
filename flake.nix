@@ -15,9 +15,24 @@
         in
         {
           devShell = pkgs.mkShell {
-            buildInputs = [
-                pkgs.bun
+            buildInputs = with pkgs; [
+              bun
+              rustc
+              cargo
+              pkg-config
+              openssl
+              glib
+              gtk3
+              libsoup_3
+              webkitgtk_4_1
+              libayatana-appindicator
+              librsvg
+              patchelf
             ];
+
+            shellHook = ''
+              export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig:$PKG_CONFIG_PATH"
+            '';
           };
         }
       );

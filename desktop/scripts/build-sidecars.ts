@@ -10,57 +10,33 @@ const targetTriple =
   process.env.CARGO_BUILD_TARGET ||
   (await detectHostTriple())
 
-const hostTriple = await detectHostTriple()
-const isNixOS = await Bun.file('/etc/NIXOS').exists() || await Bun.file('/etc/nixos').exists()
+const bunTarget = mapTargetTripleToBun(targetTriple)
+
+// 编译前先扫一遍 src/ 把所有缺失的 ant-internal 模块在磁盘上 stub 出来。
+// 见 desktop/scripts/scan-missing-imports.ts。
+console.log('[build-sidecars] scanning for missing imports...')
+const scanProc = Bun.spawn(
+  ['bun', 'run', path.join(desktopRoot, 'scripts/scan-missing-imports.ts')],
+  { cwd: repoRoot, stdout: 'inherit', stderr: 'inherit' },
+)
+const scanExit = await scanProc.exited
+if (scanExit !== 0) {
+  throw new Error(`[build-sidecars] scan-missing-imports failed (exit ${scanExit})`)
+}
+
+await mkdir(binariesDir, { recursive: true })
 
 // 单一合并 sidecar：server / cli 共享一份 bun runtime + 共享依赖代码。
 // 调用方（Tauri lib.rs / conversationService）通过第一个 positional 参数
 // 选择 'server' 或 'cli' 模式，详见 desktop/sidecars/claude-sidecar.ts。
-const outfile = path.join(binariesDir, `claude-sidecar-${targetTriple}`)
 await compileExecutable({
   entrypoint: path.join(desktopRoot, 'sidecars/claude-sidecar.ts'),
-  outfileBase: outfile,
+  outfileBase: path.join(binariesDir, `claude-sidecar-${targetTriple}`),
   productName: 'Claude Code Sidecar',
-  bunTarget: mapTargetTripleToBun(targetTriple),
+  bunTarget,
 })
 
-if (isNixOS && targetTriple === hostTriple) {
-  console.log(`[build-sidecars] NixOS detected, patching binary: ${outfile}`)
-  try {
-    // Try to find the interpreter path using common Nix environment hints
-    // or by inspecting a known-good local binary (like 'bun' itself)
-    const getInterpreter = () => {
-        try {
-            // Standard Nix way if running inside nix develop
-            const ccPath = process.env.NIX_CC;
-            if (ccPath) {
-                const fs = require('node:fs');
-                const linkerFile = path.join(ccPath, 'nix-support/dynamic-linker');
-                if (fs.existsSync(linkerFile)) {
-                    return fs.readFileSync(linkerFile, 'utf8').trim();
-                }
-            }
-        } catch {}
-        return null;
-    };
-
-    const interpreter = getInterpreter();
-    if (interpreter) {
-      console.log(`[build-sidecars] Setting interpreter to ${interpreter}`)
-      const patch = Bun.spawn(['patchelf', '--set-interpreter', interpreter, outfile], {
-          stdout: 'inherit',
-          stderr: 'inherit'
-      })
-      await patch.exited
-    } else {
-        console.warn('[build-sidecars] Could not determine Nix interpreter path, skipping patchelf.')
-    }
-  } catch (e) {
-    console.warn(`[build-sidecars] Failed to patch binary with patchelf: ${e}`)
-  }
-}
-
-console.log(`[build-sidecars] Built desktop sidecar for ${targetTriple} (${mapTargetTripleToBun(targetTriple)})`)
+console.log(`[build-sidecars] Built desktop sidecar for ${targetTriple} (${bunTarget})`)
 
 async function detectHostTriple() {
   const proc = Bun.spawn(['rustc', '-vV'], {

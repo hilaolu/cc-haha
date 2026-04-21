@@ -1,4 +1,5 @@
 use std::{
+    io::{Error as IoError, ErrorKind},
     net::{SocketAddr, TcpListener, TcpStream},
     path::PathBuf,
     sync::Mutex,
@@ -14,9 +15,6 @@ use tauri_plugin_shell::{
     process::{CommandChild, CommandEvent},
     ShellExt,
 };
-
-#[derive(Default)]
-struct ServerConfig(Mutex<Option<String>>);
 
 #[derive(Default)]
 struct ServerState(Mutex<ServerStatus>);
@@ -42,20 +40,8 @@ struct ServerStatus {
 struct AdapterState(Mutex<Option<CommandChild>>);
 
 #[tauri::command]
-fn get_server_url(
-    config: State<'_, ServerConfig>,
-    state: State<'_, ServerState>,
-) -> Result<String, String> {
-    // 1. If remote URL is configured in ServerConfig, return it immediately
-    if let Ok(guard) = config.inner().0.lock() {
-        if let Some(url) = guard.as_ref() {
-            return Ok(url.clone());
-        }
-    }
-
-    // 2. Otherwise return local runtime URL
+fn get_server_url(state: State<'_, ServerState>) -> Result<String, String> {
     let guard = state
-        .inner()
         .0
         .lock()
         .map_err(|_| "desktop server state is unavailable".to_string())?;
@@ -68,40 +54,6 @@ fn get_server_url(
         .startup_error
         .clone()
         .unwrap_or_else(|| "desktop server did not start".to_string()))
-}
-
-#[tauri::command]
-fn set_remote_server_state(
-    url: Option<String>,
-    config: State<'_, ServerConfig>,
-    state: State<'_, ServerState>,
-    app: AppHandle,
-) -> Result<(), String> {
-    let mut config_guard = config.inner().0.lock().map_err(|_| "config lock poisoned")?;
-    *config_guard = url.clone();
-
-    if url.is_some() {
-        // If we have a remote URL, stop local sidecar if it's running
-        stop_server_sidecar(&app);
-        stop_adapters_sidecar(&app);
-    } else {
-        // If we removed the remote URL, start local sidecar if it's not running
-        let mut state_guard = state.inner().0.lock().map_err(|_| "state lock poisoned")?;
-        if state_guard.runtime.is_none() {
-            match start_server_sidecar(&app) {
-                Ok(runtime) => {
-                    state_guard.runtime = Some(runtime);
-                    state_guard.startup_error = None;
-                    drop(state_guard); // Release lock before starting adapters
-                    spawn_and_track_adapters_sidecar(&app);
-                }
-                Err(err) => {
-                    state_guard.startup_error = Some(err);
-                }
-            }
-        }
-    }
-    Ok(())
 }
 
 /// 前端在设置页保存飞书 / Telegram 凭据后调用，触发 adapter sidecar 热重启。
@@ -223,7 +175,7 @@ fn stop_server_sidecar(app: &AppHandle) {
         return;
     };
 
-    let Ok(mut guard) = state.inner().0.lock() else {
+    let Ok(mut guard) = state.0.lock() else {
         return;
     };
 
@@ -249,7 +201,6 @@ fn start_adapters_sidecar(app: &AppHandle) -> Result<CommandChild, String> {
         .try_state::<ServerState>()
         .and_then(|state| {
             state
-                .inner()
                 .0
                 .lock()
                 .ok()
@@ -319,7 +270,7 @@ fn spawn_and_track_adapters_sidecar(app: &AppHandle) {
     match start_adapters_sidecar(app) {
         Ok(child) => {
             if let Some(state) = app.try_state::<AdapterState>() {
-                if let Ok(mut guard) = state.inner().0.lock() {
+                if let Ok(mut guard) = state.0.lock() {
                     *guard = Some(child);
                 }
             }
@@ -334,7 +285,7 @@ fn stop_adapters_sidecar(app: &AppHandle) {
     let Some(state) = app.try_state::<AdapterState>() else {
         return;
     };
-    let Ok(mut guard) = state.inner().0.lock() else {
+    let Ok(mut guard) = state.0.lock() else {
         return;
     };
     if let Some(child) = guard.take() {
@@ -345,7 +296,6 @@ fn stop_adapters_sidecar(app: &AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
-        .manage(ServerConfig::default())
         .manage(ServerState::default())
         .manage(AdapterState::default())
         .plugin(tauri_plugin_shell::init())
@@ -354,7 +304,6 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             get_server_url,
-            set_remote_server_state,
             restart_adapters_sidecar
         ]);
 
@@ -420,10 +369,31 @@ pub fn run() {
         });
 
     let app = builder
-        .setup(|_app| {
-            // We no longer start the sidecar here. 
-            // The frontend will call initializeDesktopServerUrl() which will
-            // decide whether to use a remote URL or invoke a command to start local server.
+        .setup(|app| {
+            let state = app.state::<ServerState>();
+            let mut guard = state
+                .0
+                .lock()
+                .map_err(|_| IoError::new(ErrorKind::Other, "server state lock poisoned"))?;
+
+            match start_server_sidecar(&app.handle()) {
+                Ok(runtime) => {
+                    guard.runtime = Some(runtime);
+                    guard.startup_error = None;
+                }
+                Err(err) => {
+                    eprintln!("[desktop] failed to start local server: {err}");
+                    guard.runtime = None;
+                    guard.startup_error = Some(err);
+                }
+            }
+            drop(guard);
+
+            // server 起来之后再起 adapter sidecar —— start_adapters_sidecar
+            // 内部会从 ServerState 读 server URL 注入 ADAPTER_SERVER_URL env，
+            // 让 adapter 连上动态端口。
+            spawn_and_track_adapters_sidecar(&app.handle());
+
             Ok(())
         })
         .build(tauri::generate_context!())
