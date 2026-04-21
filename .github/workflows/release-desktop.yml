@@ -107,16 +107,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libxdo-dev \
-            libssl-dev \
+            build-essential curl wget file \
+            libxdo-dev libssl-dev \
             libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf \
+            librsvg2-dev patchelf \
             libfuse2
 
       # ── Bun ──────────────────────────────────────────────────
@@ -188,17 +183,56 @@ jobs:
 
       # ── Build Tauri app ──────────────────────────────────────
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
+        working-directory: desktop
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAURI_ENV_TARGET_TRIPLE: ${{ matrix.rust_target }}
+        run: |
+          # Use CI config which disables updater artifacts if keys are problematic
+          ARGS=(bunx tauri build --ci --config src-tauri/tauri.release-ci.json)
+          
+          if [ -n "${{ matrix.tauri_args }}" ]; then
+            ARGS+=(${{ matrix.tauri_args }})
+          fi
+
+          "${ARGS[@]}"
+        shell: bash
+
+      # ── Collect artifacts ─────────────────────────────────────
+      - name: Collect artifacts
+        id: collect
+        shell: bash
+        run: |
+          BUNDLE_DIR="desktop/src-tauri/target/${{ matrix.rust_target }}/release/bundle"
+          FALLBACK_DIR="desktop/src-tauri/target/release/bundle"
+
+          if [ -d "$BUNDLE_DIR" ]; then
+            SEARCH_DIR="$BUNDLE_DIR"
+          else
+            SEARCH_DIR="$FALLBACK_DIR"
+          fi
+
+          STAGING="desktop/release-artifacts/${{ matrix.label }}"
+          mkdir -p "$STAGING"
+
+          if [ -d "$SEARCH_DIR" ]; then
+            find "$SEARCH_DIR" \
+              \( -type f \( \
+                -name "*.dmg" -o -name "*.exe" -o -name "*.msi" -o \
+                -name "*.deb" -o -name "*.AppImage" -o -name "*.zip" \
+              \) \) -o \
+              \( -type d -name "*.app" \) | while read -r f; do
+              cp -R "$f" "$STAGING/"
+            done
+          fi
+          echo "staging_dir=$STAGING" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          projectPath: desktop
-          tauriScript: bunx tauri
-          tagName: v__VERSION__
-          releaseName: 'Claude Code Haha v__VERSION__'
-          releaseBody: ${{ steps.release_notes.outputs.body }}
-          releaseDraft: ${{ github.event_name == 'workflow_dispatch' && inputs.draft || false }}
-          prerelease: false
-          args: ${{ matrix.tauri_args }} --config src-tauri/tauri.release-ci.json
+          files: ${{ steps.collect.outputs.staging_dir }}/*
+          body: ${{ steps.release_notes.outputs.body }}
+          draft: ${{ github.event_name == 'workflow_dispatch' && inputs.draft || false }}
