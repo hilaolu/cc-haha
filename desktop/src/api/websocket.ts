@@ -1,5 +1,5 @@
 import type { ClientMessage, ServerMessage } from '../types/chat'
-import { getBaseUrl } from './client'
+import { getBaseUrl, getAuthToken } from './client'
 
 type MessageHandler = (msg: ServerMessage) => void
 
@@ -30,7 +30,11 @@ class WebSocketManager {
     if (existing && !existing.intentionalClose) return
 
     const wsUrl = getBaseUrl().replace(/^http/, 'ws')
-    const ws = new WebSocket(`${wsUrl}/ws/${sessionId}`)
+    const token = getAuthToken()
+    const url = token
+      ? `${wsUrl}/ws/${sessionId}?token=${encodeURIComponent(token)}`
+      : `${wsUrl}/ws/${sessionId}`
+    const ws = new WebSocket(url)
 
     const conn: Connection = {
       ws,

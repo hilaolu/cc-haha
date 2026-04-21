@@ -6,6 +6,20 @@
  */
 
 export function validateAuth(req: Request): { valid: boolean; error?: string } {
+  const url = new URL(req.url)
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) {
+    return { valid: false, error: 'Server ANTHROPIC_API_KEY not configured' }
+  }
+
+  // Accept token from query param (WebSocket upgrades can't send custom headers)
+  const queryToken = url.searchParams.get('token')
+  if (queryToken) {
+    return queryToken === apiKey
+      ? { valid: true }
+      : { valid: false, error: 'Invalid API key' }
+  }
+
   const authHeader = req.headers.get('Authorization')
 
   if (!authHeader) {
@@ -16,11 +30,6 @@ export function validateAuth(req: Request): { valid: boolean; error?: string } {
 
   if (scheme !== 'Bearer' || !token) {
     return { valid: false, error: 'Invalid Authorization format. Use: Bearer <token>' }
-  }
-
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    return { valid: false, error: 'Server ANTHROPIC_API_KEY not configured' }
   }
 
   if (token !== apiKey) {
